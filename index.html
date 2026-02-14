@@ -12,6 +12,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     
+    <!-- EmailJS for email notifications -->
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    
     <style>
         :root {
             --paper-white: #ffffff;
@@ -26,6 +29,12 @@
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background-color: var(--paper-white); color: var(--ink-black); font-family: 'Inter', sans-serif; overflow-x: hidden; }
+        body.dark-mode {
+            --paper-white: #0a0a0a;
+            --ink-black: #e0e0e0;
+            --news-gray: #1a1a1a;
+            --border-soft: #333;
+        }
 
         /* TOAST NOTIFICATIONS */
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
@@ -40,7 +49,7 @@
         @keyframes fadeOut { to { opacity: 0; transform: translateX(50px); } }
 
         /* NAVIGATION & HEADER */
-        .nav-bar { display: flex; justify-content: center; gap: 30px; padding: 15px; border-bottom: 1px solid var(--border-soft); background: #fff; position: sticky; top: 0; z-index: 100; flex-wrap: wrap; }
+        .nav-bar { display: flex; justify-content: center; gap: 30px; padding: 15px; border-bottom: 1px solid var(--border-soft); background: var(--paper-white); position: sticky; top: 0; z-index: 100; flex-wrap: wrap; }
         .nav-link { text-decoration: none; color: var(--ink-black); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: 0.2s; position: relative; }
         .nav-link:hover, .nav-link.active { color: var(--accent-gold); }
 
@@ -52,8 +61,10 @@
         @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .rotating { animation: rotate 1s linear infinite; }
 
-        header { padding: 40px 5%; text-align: center; border-bottom: 4px double var(--border-soft); }
+        header { padding: 40px 5%; text-align: center; border-bottom: 4px double var(--border-soft); position: relative; }
         .brand { font-family: 'Playfair Display', serif; font-size: 56px; color: var(--ink-black); text-decoration: none; cursor: pointer; }
+        .dark-mode-toggle { position: absolute; top: 20px; right: 20px; background: var(--ink-black); color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 5px; font-size: 11px; font-weight: bold; transition: 0.3s; }
+        .dark-mode-toggle:hover { background: var(--accent-gold); }
         
         /* CONTENT LAYOUT */
         .container { max-width: 1440px; margin: 0 auto; padding: 30px; display: grid; grid-template-columns: 300px 1fr 320px; gap: 40px; }
@@ -63,7 +74,7 @@
         .section-label { font-size: 12px; font-weight: 900; text-transform: uppercase; border-bottom: 2px solid var(--ink-black); margin-bottom: 15px; display: block; padding-bottom: 5px; }
 
         /* FULL WIDTH PAGES */
-        .full-page { max-width: 1000px; margin: 0 auto; padding: 60px 20px; text-align: center; display: none; }
+        .full-page { max-width: 1200px; margin: 0 auto; padding: 60px 20px; display: none; }
         .full-page.active { display: block; }
 
         /* DONATION CARDS */
@@ -86,10 +97,11 @@
 
         .auth-btn { width: 100%; padding: 12px; background: var(--ink-black); color: white; border: none; cursor: pointer; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; transition: 0.2s; }
         .auth-btn:hover { background: var(--accent-gold); }
+        .auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         /* MODALS */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); overflow-y: auto; }
-        .modal-content { background-color: white; margin: 5% auto; padding: 40px; width: 90%; max-width: 500px; border: 2px solid var(--accent-gold); }
+        .modal-content { background-color: var(--paper-white); margin: 5% auto; padding: 40px; width: 90%; max-width: 500px; border: 2px solid var(--accent-gold); }
         .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
         .close:hover { color: #000; }
         .auth-input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid var(--border-soft); font-size: 13px; }
@@ -97,9 +109,24 @@
         .auth-tab { flex: 1; padding: 10px; background: var(--news-gray); cursor: pointer; text-align: center; font-weight: bold; font-size: 11px; border: 1px solid var(--border-soft); }
         .auth-tab.active { background: var(--ink-black); color: white; }
 
+        /* COIN SEARCH MODAL */
+        .coin-search-modal { display: none; position: fixed; z-index: 1500; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); }
+        .coin-search-content { background: var(--paper-white); margin: 5% auto; padding: 0; width: 90%; max-width: 600px; border: 3px solid var(--accent-gold); box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .coin-search-header { background: var(--ink-black); color: white; padding: 25px 30px; display: flex; justify-content: space-between; align-items: center; }
+        .coin-search-body { padding: 30px; }
+        .coin-search-input { width: 100%; padding: 15px; font-size: 16px; border: 2px solid var(--border-soft); font-family: 'Inter', sans-serif; transition: 0.3s; }
+        .coin-search-input:focus { outline: none; border-color: var(--accent-gold); }
+        .coin-results { max-height: 400px; overflow-y: auto; margin-top: 15px; border: 1px solid var(--border-soft); }
+        .coin-result-item { padding: 15px 20px; border-bottom: 1px solid #eee; cursor: pointer; transition: 0.2s; display: flex; justify-content: space-between; align-items: center; }
+        .coin-result-item:hover { background: var(--news-gray); border-left: 4px solid var(--accent-gold); }
+        .coin-result-name { font-weight: bold; font-size: 14px; }
+        .coin-result-symbol { color: #666; font-size: 12px; text-transform: uppercase; margin-left: 10px; }
+        .coin-result-id { color: #999; font-size: 11px; }
+        .no-results { padding: 40px; text-align: center; color: #999; }
+
         /* LOGOUT CONFIRMATION MODAL */
         .confirm-modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); }
-        .confirm-content { background-color: white; margin: 15% auto; padding: 40px; width: 90%; max-width: 400px; border: 2px solid var(--accent-gold); text-align: center; }
+        .confirm-content { background-color: var(--paper-white); margin: 15% auto; padding: 40px; width: 90%; max-width: 400px; border: 2px solid var(--accent-gold); text-align: center; }
         .confirm-buttons { display: flex; gap: 10px; margin-top: 30px; }
         .confirm-btn { flex: 1; padding: 12px; border: none; cursor: pointer; font-weight: bold; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; transition: 0.2s; }
         .confirm-yes { background: var(--bearish); color: white; }
@@ -110,8 +137,96 @@
         /* SENTIMENT GRID */
         .sentiment-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; margin-top: 40px; }
 
-        /* TECHNICAL OUTLOOK FIX */
-        #tv-container { height: 400px; width: 100%; }
+        /* COMMUNITY STYLES */
+        .poll-card { background: var(--paper-white); border: 2px solid var(--border-soft); padding: 30px; margin-bottom: 30px; transition: 0.3s; }
+        .poll-card:hover { border-color: var(--accent-gold); }
+        .vote-btn { padding: 15px 30px; font-size: 13px; font-weight: bold; border: 2px solid var(--border-soft); background: var(--paper-white); cursor: pointer; margin: 10px 10px 10px 0; transition: 0.3s; text-transform: uppercase; letter-spacing: 1px; }
+        .vote-btn:hover { background: var(--accent-gold); color: white; border-color: var(--accent-gold); }
+        .vote-btn.voted { background: var(--ink-black); color: white; border-color: var(--ink-black); }
+        .vote-results { margin-top: 20px; }
+        .vote-bar { height: 30px; background: var(--news-gray); margin: 10px 0; position: relative; border: 1px solid #ddd; }
+        .vote-bar-fill { height: 100%; background: var(--accent-gold); transition: width 0.5s; }
+        .vote-bar-label { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-weight: bold; font-size: 12px; z-index: 1; }
+        
+        .comment-section { margin-top: 30px; padding-top: 20px; border-top: 2px solid var(--border-soft); }
+        .comment-input { width: 100%; padding: 15px; border: 1px solid var(--border-soft); font-size: 13px; margin-bottom: 10px; font-family: 'Inter', sans-serif; }
+        .comment { background: var(--news-gray); padding: 15px; margin: 10px 0; border-left: 3px solid var(--accent-gold); }
+        .comment-author { font-weight: bold; font-size: 12px; color: var(--accent-gold); margin-bottom: 5px; }
+        .comment-text { font-size: 13px; line-height: 1.6; }
+        .comment-time { font-size: 10px; color: #999; margin-top: 5px; }
+
+        /* ECONOMIC CALENDAR STYLES */
+        .news-item { background: var(--paper-white); border: 2px solid var(--border-soft); padding: 25px; margin-bottom: 20px; transition: 0.3s; }
+        .news-item:hover { border-color: var(--accent-gold); }
+        .news-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; gap: 15px; }
+        .news-title { font-family: 'Playfair Display'; font-size: 20px; flex: 1; }
+        .impact-badge { padding: 5px 10px; font-size: 10px; font-weight: bold; border-radius: 3px; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+        .impact-high { background: var(--bearish); color: white; }
+        .impact-medium { background: #ff9800; color: white; }
+        .impact-low { background: #999; color: white; }
+        .news-date { font-size: 12px; color: #666; margin-bottom: 10px; }
+        .news-description { font-size: 13px; line-height: 1.6; color: #333; margin-bottom: 15px; }
+        .analyze-btn { padding: 10px 20px; background: var(--accent-gold); color: white; border: none; cursor: pointer; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; transition: 0.3s; }
+        .analyze-btn:hover { background: var(--ink-black); }
+        .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .analysis-result { margin-top: 15px; padding: 20px; background: var(--news-gray); border-left: 4px solid var(--accent-gold); }
+        .analysis-verdict { font-weight: bold; font-size: 14px; margin-bottom: 10px; }
+        .verdict-bullish { color: var(--bullish); }
+        .verdict-bearish { color: var(--bearish); }
+        .verdict-neutral { color: #666; }
+
+        /* WATCHLIST STYLES */
+        .watchlist-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .watchlist-add { background: var(--paper-white); border: 2px dashed var(--border-soft); padding: 40px; text-align: center; cursor: pointer; transition: 0.3s; }
+        .watchlist-add:hover { border-color: var(--accent-gold); background: var(--news-gray); transform: scale(1.02); }
+        .watchlist-coin { background: var(--paper-white); border: 2px solid var(--border-soft); padding: 25px; margin-bottom: 20px; transition: 0.3s; position: relative; }
+        .watchlist-coin:hover { border-color: var(--accent-gold); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .remove-coin { position: absolute; top: 10px; right: 10px; background: var(--bearish); color: white; border: none; padding: 5px 10px; cursor: pointer; font-size: 10px; font-weight: bold; border-radius: 3px; transition: 0.2s; }
+        .remove-coin:hover { background: #8b0000; }
+        .alert-section { margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd; }
+        .alert-input { padding: 8px; border: 1px solid var(--border-soft); font-size: 12px; margin-right: 10px; width: 150px; }
+        .add-alert-btn { padding: 8px 15px; background: var(--bullish); color: white; border: none; cursor: pointer; font-size: 11px; font-weight: bold; transition: 0.2s; }
+        .add-alert-btn:hover { background: #136313; }
+        .alert-item { background: var(--news-gray); padding: 10px; margin: 5px 0; font-size: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .delete-alert { background: var(--bearish); color: white; border: none; padding: 3px 8px; cursor: pointer; font-size: 10px; transition: 0.2s; }
+        .delete-alert:hover { background: #8b0000; }
+
+        /* PORTFOLIO TRACKER */
+        .portfolio-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 30px; }
+        .portfolio-add { background: var(--paper-white); border: 2px dashed var(--border-soft); padding: 30px; text-align: center; cursor: pointer; transition: 0.3s; }
+        .portfolio-add:hover { border-color: var(--accent-gold); background: var(--news-gray); }
+        .portfolio-holding { background: var(--paper-white); border: 2px solid var(--border-soft); padding: 20px; transition: 0.3s; position: relative; }
+        .portfolio-holding:hover { border-color: var(--accent-gold); }
+
+        /* MARKET HEATMAP */
+        .heatmap-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 30px; }
+        .heatmap-cell { padding: 20px; text-align: center; border: 1px solid var(--border-soft); transition: 0.3s; cursor: pointer; }
+        .heatmap-cell:hover { transform: scale(1.05); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+
+        /* LEARNING CENTER */
+        .learning-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px; margin-top: 30px; }
+        .learning-card { background: var(--paper-white); border: 2px solid var(--border-soft); padding: 30px; transition: 0.3s; cursor: pointer; }
+        .learning-card:hover { border-color: var(--accent-gold); transform: translateY(-5px); }
+
+        /* SCREENER */
+        .screener-filters { background: var(--news-gray); padding: 20px; margin-bottom: 20px; border: 1px solid var(--border-soft); }
+        .filter-group { margin-bottom: 15px; }
+        .filter-label { font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; display: block; }
+        .filter-input { padding: 8px; border: 1px solid var(--border-soft); font-size: 12px; margin-right: 10px; }
+
+        /* COMPARISON TOOL */
+        .comparison-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px; margin-top: 30px; }
+        .comparison-coin { background: var(--news-gray); padding: 25px; border: 2px solid var(--border-soft); }
+
+        /* STAKING CALCULATOR */
+        .calculator-container { max-width: 600px; margin: 30px auto; background: var(--news-gray); padding: 40px; border: 2px solid var(--border-soft); }
+        .calc-input-group { margin-bottom: 20px; }
+        .calc-label { font-size: 12px; font-weight: bold; margin-bottom: 5px; display: block; }
+        .calc-input { width: 100%; padding: 12px; border: 1px solid var(--border-soft); font-size: 14px; }
+        .calc-result { background: var(--ink-black); color: white; padding: 30px; margin-top: 20px; text-align: center; }
+
+        /* TECHNICAL OUTLOOK */
+        #tv-container, #tv-container-btc { height: 400px; width: 100%; }
 
         /* FOOTER */
         footer { background: var(--ink-black); color: white; padding: 30px 20px; text-align: center; border-top: 4px double var(--accent-gold); margin-top: 60px; }
@@ -121,16 +236,28 @@
         .social-icon { width: 40px; height: 40px; border: 2px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: 0.3s; }
         .social-link:hover .social-icon { border-color: var(--accent-gold); background: var(--accent-gold); }
 
+        /* NOTIFICATIONS PERMISSION */
+        .notification-prompt { position: fixed; bottom: 20px; right: 20px; background: var(--ink-black); color: white; padding: 20px; border-radius: 5px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); z-index: 1500; max-width: 350px; display: none; }
+
         @media (max-width: 1100px) { 
             .container { grid-template-columns: 1fr; } 
-            .stat-grid, .sentiment-grid, .donation-grid { grid-template-columns: 1fr; }
-            #tv-container { height: 300px; }
+            .stat-grid, .sentiment-grid, .donation-grid, .watchlist-container, .portfolio-grid, .comparison-container, .learning-grid { grid-template-columns: 1fr; }
+            #tv-container, #tv-container-btc { height: 300px; }
+            .heatmap-container { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
         }
     </style>
 </head>
 <body>
 
     <div id="toast-container"></div>
+
+    <!-- NOTIFICATION PERMISSION PROMPT -->
+    <div id="notification-prompt" class="notification-prompt">
+        <h3 style="font-family: 'Playfair Display'; margin-bottom: 10px;">Enable Price Alerts</h3>
+        <p style="font-size: 12px; margin-bottom: 15px; line-height: 1.6;">Get instant browser notifications when your watchlist prices hit target levels.</p>
+        <button class="auth-btn" onclick="requestNotificationPermission()">ENABLE NOTIFICATIONS</button>
+        <button class="auth-btn" style="background: #666; margin-top: 10px;" onclick="closeNotificationPrompt()">MAYBE LATER</button>
+    </div>
 
     <!-- AUTH MODAL -->
     <div id="auth-modal" class="modal">
@@ -161,6 +288,55 @@
         </div>
     </div>
 
+    <!-- COIN SEARCH MODAL -->
+    <div id="coin-search-modal" class="coin-search-modal">
+        <div class="coin-search-content">
+            <div class="coin-search-header">
+                <h2 style="font-family: 'Playfair Display'; font-size: 24px;">
+                    <i data-lucide="search" size="24" style="display: inline; vertical-align: middle;"></i>
+                    Add Cryptocurrency
+                </h2>
+                <span class="close" onclick="closeCoinSearchModal()" style="color: white;">&times;</span>
+            </div>
+            <div class="coin-search-body">
+                <input type="text" id="coin-search-input" class="coin-search-input" placeholder="Search by name or symbol (e.g., Bitcoin, BTC)..." autocomplete="off">
+                <div id="coin-results" class="coin-results"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PORTFOLIO COIN SEARCH MODAL -->
+    <div id="portfolio-search-modal" class="coin-search-modal">
+        <div class="coin-search-content">
+            <div class="coin-search-header">
+                <h2 style="font-family: 'Playfair Display'; font-size: 24px;">
+                    <i data-lucide="briefcase" size="24" style="display: inline; vertical-align: middle;"></i>
+                    Add to Portfolio
+                </h2>
+                <span class="close" onclick="closePortfolioSearchModal()" style="color: white;">&times;</span>
+            </div>
+            <div class="coin-search-body">
+                <input type="text" id="portfolio-search-input" class="coin-search-input" placeholder="Search cryptocurrency..." autocomplete="off">
+                <div id="portfolio-results" class="coin-results"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADD PORTFOLIO HOLDING MODAL -->
+    <div id="add-holding-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeAddHoldingModal()">&times;</span>
+            <h2 style="font-family: 'Playfair Display'; margin-bottom: 20px;" id="holding-coin-name">Add Holding</h2>
+            
+            <input type="number" id="holding-amount" class="auth-input" placeholder="Amount (e.g., 0.5)" step="0.00000001">
+            <input type="number" id="holding-buy-price" class="auth-input" placeholder="Buy Price (USD)" step="0.01">
+            <input type="date" id="holding-buy-date" class="auth-input">
+            
+            <button class="auth-btn" onclick="savePortfolioHolding()">ADD TO PORTFOLIO</button>
+            <div id="holding-error" style="color: var(--bearish); font-size: 11px; margin-top: 10px;"></div>
+        </div>
+    </div>
+
     <!-- LOGOUT CONFIRMATION MODAL -->
     <div id="logout-modal" class="confirm-modal">
         <div class="confirm-content">
@@ -178,18 +354,32 @@
     </div>
 
     <header>
+        <button class="dark-mode-toggle" onclick="toggleDarkMode()">
+            <i data-lucide="moon" size="14" style="display: inline; vertical-align: middle;"></i>
+            DARK MODE
+        </button>
         <a class="brand" onclick="switchPage('home')">LYNX INTELLIGENCE</a>
         <div style="font-size: 11px; letter-spacing: 3px; margin-top: 10px; color: #555;" id="live-clock"></div>
     </header>
 
     <nav class="nav-bar">
-        <div class="nav-link active" onclick="switchPage('home')">Home / Despatches</div>
-        <div class="nav-link" onclick="switchPage('bitcoin')" id="nav-bitcoin">Bitcoin Analytics</div>
-        <div class="nav-link" onclick="switchPage('sentiment')" id="nav-sentiment">Global Sentiment</div>
-        <div class="nav-link" onclick="switchPage('donate')" id="nav-donate">Support Us</div>
+        <div class="nav-link active" onclick="switchPage('home')">Home</div>
+        <div class="nav-link" onclick="switchPage('bitcoin')" id="nav-bitcoin">Bitcoin</div>
+        <div class="nav-link" onclick="switchPage('sentiment')" id="nav-sentiment">Sentiment</div>
+        <div class="nav-link" onclick="switchPage('portfolio')" id="nav-portfolio">Portfolio</div>
+        <div class="nav-link" onclick="switchPage('watchlist')" id="nav-watchlist">Watchlist</div>
+        <div class="nav-link" onclick="switchPage('heatmap')" id="nav-heatmap">Heatmap</div>
+        <div class="nav-link" onclick="switchPage('screener')" id="nav-screener">Screener</div>
+        <div class="nav-link" onclick="switchPage('compare')" id="nav-compare">Compare</div>
+        <div class="nav-link" onclick="switchPage('community')" id="nav-community">Community</div>
+        <div class="nav-link" onclick="switchPage('calendar')" id="nav-calendar">Calendar</div>
+        <div class="nav-link" onclick="switchPage('staking')" id="nav-staking">Staking Calc</div>
+        <div class="nav-link" onclick="switchPage('learning')" id="nav-learning">Learn</div>
+        <div class="nav-link" onclick="switchPage('donate')" id="nav-donate">Support</div>
         <div class="nav-link" id="user-display" onclick="handleAuthClick()" style="border-left: 1px solid #ddd; padding-left: 30px;">Login / Sign Up</div>
     </nav>
 
+    <!-- HOME PAGE -->
     <div id="home-page" class="container page-content active">
         <aside>
             <span class="section-label">Market Overview</span>
@@ -205,6 +395,20 @@
                 <div style="font-size: 48px; font-weight: 800; color: var(--accent-gold);" id="fear-greed-val">--</div>
                 <div style="text-transform: uppercase; font-weight: bold; letter-spacing: 2px; font-size: 11px; margin-top: 10px;" id="fear-greed-label">Loading...</div>
                 <div style="margin-top: 15px; height: 8px; background: linear-gradient(90deg, #b21203, #ff9800, #ffc107, #8bc34a, #4caf50); width: 100%; border-radius: 4px;"></div>
+            </div>
+
+            <span class="section-label">Top Gainers</span>
+            <div class="card" id="top-gainers">
+                <div style="font-size: 11px; text-align: center; padding: 20px; color: #666;">
+                    Loading...
+                </div>
+            </div>
+
+            <span class="section-label">Top Losers</span>
+            <div class="card" id="top-losers">
+                <div style="font-size: 11px; text-align: center; padding: 20px; color: #666;">
+                    Loading...
+                </div>
             </div>
         </aside>
 
@@ -237,6 +441,7 @@
         </aside>
     </div>
 
+    <!-- BITCOIN PAGE -->
     <div id="bitcoin-page" class="full-page">
         <div class="crypto-header">
             <h1 style="font-family: 'Playfair Display'; font-size: 48px;">Bitcoin (BTC)</h1>
@@ -264,7 +469,6 @@
 
         <div style="height: 500px; border: 1px solid #ddd; background: white; margin-bottom: 30px;" id="tv-container-btc"></div>
 
-        <!-- AI ANALYSIS SECTION -->
         <div class="card" style="text-align: left; padding: 30px; margin-top: 30px;">
             <h2 style="font-family: 'Playfair Display'; font-size: 28px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
                 <i data-lucide="brain-circuit" size="28"></i> AI Market Analysis
@@ -283,6 +487,7 @@
         </p>
     </div>
 
+    <!-- SENTIMENT PAGE -->
     <div id="sentiment-page" class="full-page">
         <h1 style="font-family: 'Playfair Display'; font-size: 48px; margin-bottom: 10px;">Global Market Sentiment</h1>
         <p style="font-size: 14px; color: var(--bullish); font-weight: 600; margin-bottom: 40px;">
@@ -344,6 +549,372 @@
         </div>
     </div>
 
+    <!-- PORTFOLIO PAGE -->
+    <div id="portfolio-page" class="full-page">
+        <h1 style="font-family: 'Playfair Display'; font-size: 48px; margin-bottom: 10px;">Portfolio Tracker</h1>
+        <p style="font-size: 14px; color: #666; margin-bottom: 30px;">
+            <i data-lucide="lock" size="14" style="display: inline; vertical-align: middle;"></i>
+            Login required to track your cryptocurrency investments
+        </p>
+
+        <div id="portfolio-content" style="display: none;">
+            <div class="stat-grid" style="margin-bottom: 30px;">
+                <div class="stat-card">
+                    <div class="section-label" style="border:none; margin:0;">Total Value</div>
+                    <div class="stat-value" id="portfolio-total-value">$0.00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="section-label" style="border:none; margin:0;">Total Invested</div>
+                    <div class="stat-value" id="portfolio-total-invested">$0.00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="section-label" style="border:none; margin:0;">Profit/Loss</div>
+                    <div class="stat-value" id="portfolio-pnl">$0.00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="section-label" style="border:none; margin:0;">ROI</div>
+                    <div class="stat-value" id="portfolio-roi">0%</div>
+                </div>
+            </div>
+
+            <div class="portfolio-grid">
+                <div class="portfolio-add" onclick="openPortfolioSearchModal()">
+                    <i data-lucide="plus-circle" size="48" style="color: var(--accent-gold);"></i>
+                    <p style="margin-top: 15px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; font-size: 13px;">Add Holding</p>
+                    <p style="font-size: 11px; color: #999; margin-top: 5px;">Track your investments</p>
+                </div>
+            </div>
+            <div id="portfolio-holdings"></div>
+        </div>
+
+        <div id="portfolio-login-prompt" style="text-align: center; padding: 100px 20px;">
+            <i data-lucide="user-x" size="64" style="color: #ccc;"></i>
+            <h2 style="font-family: 'Playfair Display'; font-size: 32px; margin: 20px 0; color: #999;">Login Required</h2>
+            <p style="color: #666; margin-bottom: 30px; font-size: 14px;">
+                Create an account or login to start tracking your portfolio
+            </p>
+            <button class="auth-btn" style="max-width: 300px; margin: 0 auto;" onclick="openAuthModal()">
+                LOGIN / SIGN UP
+            </button>
+        </div>
+    </div>
+
+    <!-- WATCHLIST PAGE -->
+    <div id="watchlist-page" class="full-page">
+        <h1 style="font-family: 'Playfair Display'; font-size: 48px; margin-bottom: 10px;">My Watchlist</h1>
+        <p style="font-size: 14px; color: #666; margin-bottom: 30px;">
+            <i data-lucide="lock" size="14" style="display: inline; vertical-align: middle;"></i>
+            Login required to track coins and set price alerts
+        </p>
+
+        <div id="watchlist-content" style="display: none;">
+            <div class="watchlist-container">
+                <div class="watchlist-add" onclick="openCoinSearchModal()">
+                    <i data-lucide="plus-circle" size="48" style="color: var(--accent-gold);"></i>
+                    <p style="margin-top: 15px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; font-size: 13px;">Add Cryptocurrency</p>
+                    <p style="font-size: 11px; color: #999; margin-top: 5px;">Search from 1000+ coins</p>
+                </div>
+            </div>
+            <div id="watchlist-items"></div>
+        </div>
+
+        <div id="watchlist-login-prompt" style="text-align: center; padding: 100px 20px;">
+            <i data-lucide="user-x" size="64" style="color: #ccc;"></i>
+            <h2 style="font-family: 'Playfair Display'; font-size: 32px; margin: 20px 0; color: #999;">Login Required</h2>
+            <p style="color: #666; margin-bottom: 30px; font-size: 14px;">
+                Create an account or login to start tracking your favorite cryptocurrencies
+            </p>
+            <button class="auth-btn" style="max-width: 300px; margin: 0 auto;" onclick="openAuthModal()">
+                LOGIN / SIGN UP
+            </button>
+        </div>
+    </div>
+
+    <!-- HEATMAP PAGE -->
+    <div id="heatmap-page" class="full-page">
+        <h1 style="font-family: 'Playfair Display'; font-size: 48px; margin-bottom: 10px;">Market Heatmap</h1>
+        <p style="font-size: 14px; color: #666; margin-bottom: 30px;">
+            Visual representation of top 100 cryptocurrencies by 24h performance
+        </p>
+        
+        <div style="margin-bottom: 20px;">
+            <button class="timeframe-btn active" onclick="filterHeatmap('all')">All</button>
+            <button class="timeframe-btn" onclick="filterHeatmap('gainers')">Gainers Only</button>
+            <button class="timeframe-btn" onclick="filterHeatmap('losers')">Losers Only</button>
+        </div>
+
+        <div id="heatmap-container" class="heatmap-container">
+            <div style="grid-column: 1/-1; text-align: center; padding: 40px;">
+                <i data-lucide="loader" size="48" class="rotating" style="color: var(--accent-gold);"></i>
+                <p style="margin-top: 20px; color: #666;">Loading market heatmap...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCREENER PAGE -->
+    <div id="screener-page" class="full-page">
+        <h1 style="font-family: 'Playfair Display'; font-size: 48px; margin-bottom: 10px;">Market Screener</h1>
+        <p style="font-size: 14px; color: #666; margin-bottom: 30px;">
+            Filter and find cryptocurrencies based on custom criteria
+        </p>
+
+        <div class="screener-filters">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;">
+                <div class="filter-group">
+                    <label class="filter-label">Min Market Cap ($)</label>
+                    <input type="number" id="filter-min-cap" class="filter-input" placeholder="e.g., 1000000">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Max Market Cap ($)</label>
+                    <input type="number" id="filter-max-cap" class="filter-input" placeholder="e.g., 1000000000">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Min 24h Change (%)</label>
+                    <input type="number" id="filter-min-change" class="filter-input" placeholder="e.g., 5" step="0.1">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Max 24h Change (%)</label>
+                    <input type="number" id="filter-max-change" class="filter-input" placeholder="e.g., 50" step="0.1">
+                </div>
+            </div>
+            <button class="auth-btn" style="max-width: 200px; margin-top: 20px;" onclick="applyScreenerFilters()">
+                <i data-lucide="filter" size="14" style="display: inline; vertical-align: middle;"></i>
+                APPLY FILTERS
+            </button>
+        </div>
+
+        <div id="screener-results">
+            <div style="text-align: center; padding: 40px;">
+                <p style="color: #666;">Apply filters to screen cryptocurrencies</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- COMPARE PAGE -->
+    <div id="compare-page" class="full-page">
+        <h1 style="font-family: 'Playfair Display'; font-size: 48px; margin-bottom: 10px;">Cryptocurrency Comparison</h1>
+        <p style="font-size: 14px; color: #666; margin-bottom: 30px;">
+            Compare two cryptocurrencies side by side
+        </p>
+
+        <div style="display: flex; gap: 20px; margin-bottom: 30px;">
+            <input type="text" id="compare-coin1" class="auth-input" placeholder="Enter first coin (e.g., bitcoin)" style="flex: 1;">
+            <input type="text" id="compare-coin2" class="auth-input" placeholder="Enter second coin (e.g., ethereum)" style="flex: 1;">
+            <button class="auth-btn" style="width: auto; padding: 12px 30px;" onclick="loadComparison()">
+                COMPARE
+            </button>
+        </div>
+
+        <div id="comparison-results" class="comparison-container">
+            <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #666;">
+                Enter two cryptocurrencies to compare
+            </div>
+        </div>
+    </div>
+
+    <!-- COMMUNITY PAGE -->
+    <div id="community-page" class="full-page">
+        <h1 style="font-family: 'Playfair Display'; font-size: 48px; margin-bottom: 10px;">Community Hub</h1>
+        <p style="font-size: 14px; color: #666; margin-bottom: 40px;">
+            Participate in polls, discussions, and share your insights with the LYNX community
+        </p>
+
+        <div id="polls-container">
+            <!-- Polls will be loaded here -->
+        </div>
+
+        <div style="text-align: center; margin-top: 40px; padding: 30px; background: var(--news-gray); border-left: 4px solid var(--accent-gold);">
+            <p style="font-size: 13px; color: #666;">
+                <i data-lucide="info" size="16" style="display: inline; vertical-align: middle;"></i>
+                Polls are created by LYNX administrators. Stay tuned for new community questions!
+            </p>
+        </div>
+    </div>
+
+    <!-- ECONOMIC CALENDAR PAGE -->
+    <div id="calendar-page" class="full-page">
+        <h1 style="font-family: 'Playfair Display'; font-size: 48px; margin-bottom: 10px;">Economic Calendar</h1>
+        <p style="font-size: 14px; color: #666; margin-bottom: 30px;">
+            High-impact economic events with AI-powered analysis
+        </p>
+
+        <div id="calendar-events">
+            <div style="text-align: center; padding: 40px;">
+                <i data-lucide="loader" size="48" class="rotating" style="color: var(--accent-gold);"></i>
+                <p style="margin-top: 20px; color: #666;">Loading economic events...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- STAKING CALCULATOR PAGE -->
+    <div id="staking-page" class="full-page">
+        <h1 style="font-family: 'Playfair Display'; font-size: 48px; margin-bottom: 10px;">Staking Calculator</h1>
+        <p style="font-size: 14px; color: #666; margin-bottom: 30px;">
+            Calculate potential staking rewards for your cryptocurrency holdings
+        </p>
+
+        <div class="calculator-container">
+            <div class="calc-input-group">
+                <label class="calc-label">Investment Amount (USD)</label>
+                <input type="number" id="stake-amount" class="calc-input" placeholder="e.g., 10000" step="0.01">
+            </div>
+            
+            <div class="calc-input-group">
+                <label class="calc-label">Annual APY (%)</label>
+                <input type="number" id="stake-apy" class="calc-input" placeholder="e.g., 5.5" step="0.1">
+            </div>
+            
+            <div class="calc-input-group">
+                <label class="calc-label">Staking Period</label>
+                <select id="stake-period" class="calc-input">
+                    <option value="30">1 Month</option>
+                    <option value="90">3 Months</option>
+                    <option value="180">6 Months</option>
+                    <option value="365" selected>1 Year</option>
+                    <option value="730">2 Years</option>
+                    <option value="1095">3 Years</option>
+                    <option value="1825">5 Years</option>
+                </select>
+            </div>
+            
+            <div class="calc-input-group">
+                <label class="calc-label">Compounding Frequency</label>
+                <select id="stake-compound" class="calc-input">
+                    <option value="1">Annually</option>
+                    <option value="12">Monthly</option>
+                    <option value="365">Daily</option>
+                </select>
+            </div>
+            
+            <button class="auth-btn" onclick="calculateStaking()">CALCULATE REWARDS</button>
+            
+            <div id="staking-result" class="calc-result" style="display: none;">
+                <h3 style="font-family: 'Playfair Display'; font-size: 24px; margin-bottom: 20px;">Your Staking Rewards</h3>
+                <div style="margin-bottom: 15px;">
+                    <div style="font-size: 12px; opacity: 0.8;">Total Value After Staking</div>
+                    <div style="font-size: 36px; font-weight: 800;" id="stake-final-value">$0.00</div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <div style="font-size: 12px; opacity: 0.8;">Total Rewards Earned</div>
+                    <div style="font-size: 24px; font-weight: 800; color: var(--accent-gold);" id="stake-rewards">$0.00</div>
+                </div>
+                <div>
+                    <div style="font-size: 12px; opacity: 0.8;">Effective APY</div>
+                    <div style="font-size: 18px; font-weight: 800;" id="stake-effective-apy">0%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LEARNING CENTER PAGE -->
+    <div id="learning-page" class="full-page">
+        <h1 style="font-family: 'Playfair Display'; font-size: 48px; margin-bottom: 10px;">Learning Center</h1>
+        <p style="font-size: 14px; color: #666; margin-bottom: 30px;">
+            Educational resources to help you understand cryptocurrency markets
+        </p>
+
+        <div class="learning-grid">
+            <div class="learning-card">
+                <i data-lucide="graduation-cap" size="48" style="color: var(--accent-gold); margin-bottom: 15px;"></i>
+                <h3 style="font-family: 'Playfair Display'; font-size: 22px; margin-bottom: 15px;">Beginner's Guide</h3>
+                <p style="font-size: 13px; color: #666; line-height: 1.8;">
+                    Learn the basics of cryptocurrency, blockchain technology, and how to get started with digital assets.
+                </p>
+                <ul style="margin-top: 15px; font-size: 12px; line-height: 2;">
+                    <li>What is Blockchain?</li>
+                    <li>Understanding Cryptocurrency</li>
+                    <li>How to Buy Your First Crypto</li>
+                    <li>Wallet Security Basics</li>
+                </ul>
+            </div>
+
+            <div class="learning-card">
+                <i data-lucide="line-chart" size="48" style="color: var(--accent-gold); margin-bottom: 15px;"></i>
+                <h3 style="font-family: 'Playfair Display'; font-size: 22px; margin-bottom: 15px;">Technical Analysis</h3>
+                <p style="font-size: 13px; color: #666; line-height: 1.8;">
+                    Master chart reading, indicators, and trading strategies to make informed investment decisions.
+                </p>
+                <ul style="margin-top: 15px; font-size: 12px; line-height: 2;">
+                    <li>Reading Candlestick Charts</li>
+                    <li>Support & Resistance Levels</li>
+                    <li>Moving Averages & Indicators</li>
+                    <li>Chart Patterns Recognition</li>
+                </ul>
+            </div>
+
+            <div class="learning-card">
+                <i data-lucide="shield-check" size="48" style="color: var(--accent-gold); margin-bottom: 15px;"></i>
+                <h3 style="font-family: 'Playfair Display'; font-size: 22px; margin-bottom: 15px;">Security Best Practices</h3>
+                <p style="font-size: 13px; color: #666; line-height: 1.8;">
+                    Protect your investments with proper security measures and risk management strategies.
+                </p>
+                <ul style="margin-top: 15px; font-size: 12px; line-height: 2;">
+                    <li>2FA & Account Security</li>
+                    <li>Hardware Wallet Setup</li>
+                    <li>Avoiding Scams & Phishing</li>
+                    <li>Safe Trading Practices</li>
+                </ul>
+            </div>
+
+            <div class="learning-card">
+                <i data-lucide="coins" size="48" style="color: var(--accent-gold); margin-bottom: 15px;"></i>
+                <h3 style="font-family: 'Playfair Display'; font-size: 22px; margin-bottom: 15px;">DeFi & Staking</h3>
+                <p style="font-size: 13px; color: #666; line-height: 1.8;">
+                    Explore decentralized finance opportunities and learn how to earn passive income through staking.
+                </p>
+                <ul style="margin-top: 15px; font-size: 12px; line-height: 2;">
+                    <li>What is DeFi?</li>
+                    <li>Staking vs Lending</li>
+                    <li>Liquidity Pool Basics</li>
+                    <li>Yield Farming Strategies</li>
+                </ul>
+            </div>
+
+            <div class="learning-card">
+                <i data-lucide="book-open" size="48" style="color: var(--accent-gold); margin-bottom: 15px;"></i>
+                <h3 style="font-family: 'Playfair Display'; font-size: 22px; margin-bottom: 15px;">Fundamental Analysis</h3>
+                <p style="font-size: 13px; color: #666; line-height: 1.8;">
+                    Learn how to evaluate cryptocurrency projects and make long-term investment decisions.
+                </p>
+                <ul style="margin-top: 15px; font-size: 12px; line-height: 2;">
+                    <li>Tokenomics Analysis</li>
+                    <li>Project Team Evaluation</li>
+                    <li>Use Case Assessment</li>
+                    <li>Market Competition Analysis</li>
+                </ul>
+            </div>
+
+            <div class="learning-card">
+                <i data-lucide="calculator" size="48" style="color: var(--accent-gold); margin-bottom: 15px;"></i>
+                <h3 style="font-family: 'Playfair Display'; font-size: 22px; margin-bottom: 15px;">Tax & Regulations</h3>
+                <p style="font-size: 13px; color: #666; line-height: 1.8;">
+                    Understanding cryptocurrency taxation and staying compliant with local regulations.
+                </p>
+                <ul style="margin-top: 15px; font-size: 12px; line-height: 2;">
+                    <li>Crypto Tax Basics</li>
+                    <li>Capital Gains Calculation</li>
+                    <li>Record Keeping Tips</li>
+                    <li>Regulatory Compliance</li>
+                </ul>
+            </div>
+        </div>
+
+        <div style="margin-top: 50px; padding: 40px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); border-left: 4px solid var(--accent-gold);">
+            <h3 style="font-family: 'Playfair Display'; font-size: 28px; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                <i data-lucide="lightbulb" size="28" style="color: var(--accent-gold);"></i>
+                Stay Updated
+            </h3>
+            <p style="font-size: 14px; line-height: 1.8;">
+                The cryptocurrency market evolves rapidly. Join our Discord community to stay updated with the latest educational content, 
+                market analysis, and connect with other traders and investors.
+            </p>
+            <button class="auth-btn" style="max-width: 300px; margin-top: 20px;" onclick="window.open('https://discord.gg/HKpbP5rhvd', '_blank')">
+                JOIN DISCORD COMMUNITY
+            </button>
+        </div>
+    </div>
+
+    <!-- DONATE PAGE -->
     <div id="donate-page" class="full-page">
         <h1 style="font-family: 'Playfair Display'; font-size: 48px;">Support LYNX Intelligence</h1>
         <p style="color: #666; margin-bottom: 20px; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.8;">
@@ -493,6 +1064,13 @@
     <script>
         lucide.createIcons();
         
+        // ========== CONFIGURATION ==========
+        const GEMINI_API_KEY = 'AIzaSyC0E6JMQQNq-Tv2iOOAW16QVOpEZ1nTxiQ';
+        const ALPHA_VANTAGE_API_KEY = '7LBBFQAR17W0TXVJ';
+        const EMAILJS_PUBLIC_KEY = 'YOUR_EMAILJS_PUBLIC_KEY'; // Get from emailjs.com
+        const EMAILJS_SERVICE_ID = 'YOUR_SERVICE_ID'; // Get from emailjs.com
+        const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID'; // Get from emailjs.com
+        
         // ========== FIREBASE CONFIGURATION ==========
         const firebaseConfig = {
             apiKey: "AIzaSyCl5bHJoZaaX8N4TUPnbu-NrHDIvuBQHIU",
@@ -503,7 +1081,6 @@
             appId: "1:114194446993386059797:web:e8b7c0c8c8c8c8c8c8c8c8"
         };
 
-        // Initialize Firebase
         let firebaseInitialized = false;
         try {
             firebase.initializeApp(firebaseConfig);
@@ -517,8 +1094,70 @@
         const auth = firebaseInitialized ? firebase.auth() : null;
         const db = firebaseInitialized ? firebase.firestore() : null;
         
-        // ========== STATE MANAGEMENT ==========
         let currentUser = null;
+        let allCoins = [];
+        let priceCheckInterval = null;
+        let selectedPortfolioCoin = null;
+
+        // ========== EMAILJS INITIALIZATION ==========
+        // Uncomment and configure EmailJS
+        // (function() {
+        //     emailjs.init(EMAILJS_PUBLIC_KEY);
+        // })();
+
+        // ========== DARK MODE ==========
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('darkMode', isDark);
+            const btn = document.querySelector('.dark-mode-toggle');
+            btn.innerHTML = isDark ? 
+                '<i data-lucide="sun" size="14" style="display: inline; vertical-align: middle;"></i> LIGHT MODE' :
+                '<i data-lucide="moon" size="14" style="display: inline; vertical-align: middle;"></i> DARK MODE';
+            lucide.createIcons();
+        }
+
+        // Load dark mode preference
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+            const btn = document.querySelector('.dark-mode-toggle');
+            btn.innerHTML = '<i data-lucide="sun" size="14" style="display: inline; vertical-align: middle;"></i> LIGHT MODE';
+        }
+
+        // ========== BROWSER NOTIFICATIONS ==========
+        function requestNotificationPermission() {
+            if ('Notification' in window) {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        showToast('Notifications enabled!', 'success');
+                        localStorage.setItem('notificationsEnabled', 'true');
+                        closeNotificationPrompt();
+                    }
+                });
+            }
+        }
+
+        function closeNotificationPrompt() {
+            document.getElementById('notification-prompt').style.display = 'none';
+            localStorage.setItem('notificationPromptShown', 'true');
+        }
+
+        function showBrowserNotification(title, body) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification(title, {
+                    body: body,
+                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="0.9em" font-size="90">📊</text></svg>'
+                });
+            }
+        }
+
+        // Show notification prompt after 10 seconds if not shown before
+        setTimeout(() => {
+            if (!localStorage.getItem('notificationPromptShown') && !localStorage.getItem('notificationsEnabled')) {
+                document.getElementById('notification-prompt').style.display = 'block';
+                lucide.createIcons();
+            }
+        }, 10000);
 
         // ========== AUTHENTICATION ==========
         function openAuthModal() {
@@ -564,6 +1203,17 @@
                 updateUserDisplay();
                 closeAuthModal();
                 showToast("Welcome back, Commander", "success");
+                
+                // Start monitoring watchlist
+                startPriceMonitoring();
+                
+                // Reload current page data
+                const activePage = document.querySelector('.nav-link.active').innerText.toLowerCase();
+                if(activePage.includes('watchlist')) {
+                    loadWatchlist();
+                } else if(activePage.includes('portfolio')) {
+                    loadPortfolio();
+                }
             } catch (error) {
                 document.getElementById('login-error').innerText = error.message;
             }
@@ -599,7 +1249,6 @@
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                 await userCredential.user.updateProfile({ displayName: name });
                 
-                // Create user document in Firestore
                 if (db) {
                     await db.collection('users').doc(userCredential.user.uid).set({
                         name: name,
@@ -612,6 +1261,7 @@
                 updateUserDisplay();
                 closeAuthModal();
                 showToast("Account created successfully", "success");
+                startPriceMonitoring();
             } catch (error) {
                 document.getElementById('signup-error').innerText = error.message;
             }
@@ -641,6 +1291,7 @@
             document.getElementById('user-display').innerText = 'Login / Sign Up';
             closeLogoutModal();
             showToast("Session terminated", "success");
+            stopPriceMonitoring();
             switchPage('home');
         }
         
@@ -649,6 +1300,217 @@
             if (currentUser) {
                 const username = currentUser.email.split('@')[0].substring(0, 8).toUpperCase();
                 display.innerText = `ID: ${username}`;
+            }
+        }
+
+        // ========== COIN SEARCH MODAL ==========
+        async function loadCoinsList() {
+            if (allCoins.length > 0) return;
+            
+            try {
+                const res = await fetch('https://api.coingecko.com/api/v3/coins/list');
+                allCoins = await res.json();
+                console.log(`✅ Loaded ${allCoins.length} cryptocurrencies`);
+            } catch (error) {
+                console.error("Failed to load coins list:", error);
+                showToast("Failed to load coins", "error");
+            }
+        }
+
+        function openCoinSearchModal() {
+            if (!currentUser) {
+                showToast("Please login first", "error");
+                return;
+            }
+            
+            document.getElementById('coin-search-modal').style.display = 'block';
+            document.getElementById('coin-search-input').value = '';
+            document.getElementById('coin-results').innerHTML = '<div class="no-results">Start typing to search...</div>';
+            document.getElementById('coin-search-input').focus();
+            lucide.createIcons();
+            
+            loadCoinsList();
+        }
+
+        function closeCoinSearchModal() {
+            document.getElementById('coin-search-modal').style.display = 'none';
+        }
+
+        function openPortfolioSearchModal() {
+            if (!currentUser) {
+                showToast("Please login first", "error");
+                return;
+            }
+            
+            document.getElementById('portfolio-search-modal').style.display = 'block';
+            document.getElementById('portfolio-search-input').value = '';
+            document.getElementById('portfolio-results').innerHTML = '<div class="no-results">Start typing to search...</div>';
+            document.getElementById('portfolio-search-input').focus();
+            lucide.createIcons();
+            
+            loadCoinsList();
+        }
+
+        function closePortfolioSearchModal() {
+            document.getElementById('portfolio-search-modal').style.display = 'none';
+        }
+
+        function closeAddHoldingModal() {
+            document.getElementById('add-holding-modal').style.display = 'none';
+            selectedPortfolioCoin = null;
+        }
+
+        // Real-time search
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('coin-search-input');
+            if (searchInput) {
+                searchInput.addEventListener('input', function(e) {
+                    const query = e.target.value.toLowerCase().trim();
+                    const resultsDiv = document.getElementById('coin-results');
+                    
+                    if (query.length < 2) {
+                        resultsDiv.innerHTML = '<div class="no-results">Type at least 2 characters...</div>';
+                        return;
+                    }
+                    
+                    const filtered = allCoins.filter(coin => 
+                        coin.name.toLowerCase().includes(query) || 
+                        coin.symbol.toLowerCase().includes(query) ||
+                        coin.id.toLowerCase().includes(query)
+                    ).slice(0, 50);
+                    
+                    if (filtered.length === 0) {
+                        resultsDiv.innerHTML = '<div class="no-results">No cryptocurrencies found</div>';
+                        return;
+                    }
+                    
+                    resultsDiv.innerHTML = filtered.map(coin => `
+                        <div class="coin-result-item" onclick="selectCoin('${coin.id}', '${coin.symbol}', '${coin.name.replace(/'/g, "\\'")}')">
+                            <div>
+                                <span class="coin-result-name">${coin.name}</span>
+                                <span class="coin-result-symbol">${coin.symbol}</span>
+                            </div>
+                            <div class="coin-result-id">${coin.id}</div>
+                        </div>
+                    `).join('');
+                });
+            }
+
+            const portfolioSearchInput = document.getElementById('portfolio-search-input');
+            if (portfolioSearchInput) {
+                portfolioSearchInput.addEventListener('input', function(e) {
+                    const query = e.target.value.toLowerCase().trim();
+                    const resultsDiv = document.getElementById('portfolio-results');
+                    
+                    if (query.length < 2) {
+                        resultsDiv.innerHTML = '<div class="no-results">Type at least 2 characters...</div>';
+                        return;
+                    }
+                    
+                    const filtered = allCoins.filter(coin => 
+                        coin.name.toLowerCase().includes(query) || 
+                        coin.symbol.toLowerCase().includes(query) ||
+                        coin.id.toLowerCase().includes(query)
+                    ).slice(0, 50);
+                    
+                    if (filtered.length === 0) {
+                        resultsDiv.innerHTML = '<div class="no-results">No cryptocurrencies found</div>';
+                        return;
+                    }
+                    
+                    resultsDiv.innerHTML = filtered.map(coin => `
+                        <div class="coin-result-item" onclick="selectPortfolioCoin('${coin.id}', '${coin.symbol}', '${coin.name.replace(/'/g, "\\'")}')">
+                            <div>
+                                <span class="coin-result-name">${coin.name}</span>
+                                <span class="coin-result-symbol">${coin.symbol}</span>
+                            </div>
+                            <div class="coin-result-id">${coin.id}</div>
+                        </div>
+                    `).join('');
+                });
+            }
+        });
+
+        async function selectCoin(coinId, symbol, name) {
+            closeCoinSearchModal();
+            
+            try {
+                const existingWatchlist = await db.collection('users').doc(currentUser.uid).collection('watchlist')
+                    .where('coinId', '==', coinId).get();
+                    
+                if (!existingWatchlist.empty) {
+                    showToast("Coin already in watchlist", "error");
+                    return;
+                }
+
+                await db.collection('users').doc(currentUser.uid).collection('watchlist').add({
+                    coinId: coinId,
+                    symbol: symbol,
+                    name: name,
+                    alerts: [],
+                    addedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                showToast(`${name} added to watchlist`, "success");
+                loadWatchlist();
+            } catch (error) {
+                console.error("Add coin error:", error);
+                showToast("Failed to add coin", "error");
+            }
+        }
+
+        function selectPortfolioCoin(coinId, symbol, name) {
+            closePortfolioSearchModal();
+            selectedPortfolioCoin = { coinId, symbol, name };
+            
+            document.getElementById('holding-coin-name').innerText = `Add ${name} to Portfolio`;
+            document.getElementById('holding-amount').value = '';
+            document.getElementById('holding-buy-price').value = '';
+            document.getElementById('holding-buy-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('holding-error').innerText = '';
+            
+            document.getElementById('add-holding-modal').style.display = 'block';
+        }
+
+        async function savePortfolioHolding() {
+            if (!selectedPortfolioCoin) return;
+            
+            const amount = parseFloat(document.getElementById('holding-amount').value);
+            const buyPrice = parseFloat(document.getElementById('holding-buy-price').value);
+            const buyDate = document.getElementById('holding-buy-date').value;
+            
+            if (!amount || amount <= 0) {
+                document.getElementById('holding-error').innerText = 'Enter valid amount';
+                return;
+            }
+            
+            if (!buyPrice || buyPrice <= 0) {
+                document.getElementById('holding-error').innerText = 'Enter valid buy price';
+                return;
+            }
+            
+            if (!buyDate) {
+                document.getElementById('holding-error').innerText = 'Select purchase date';
+                return;
+            }
+            
+            try {
+                await db.collection('users').doc(currentUser.uid).collection('portfolio').add({
+                    coinId: selectedPortfolioCoin.coinId,
+                    symbol: selectedPortfolioCoin.symbol,
+                    name: selectedPortfolioCoin.name,
+                    amount: amount,
+                    buyPrice: buyPrice,
+                    buyDate: buyDate,
+                    addedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                showToast(`${selectedPortfolioCoin.name} added to portfolio`, "success");
+                closeAddHoldingModal();
+                loadPortfolio();
+            } catch (error) {
+                console.error("Add holding error:", error);
+                document.getElementById('holding-error').innerText = 'Failed to add holding';
             }
         }
 
@@ -680,6 +1542,15 @@
                 'home': document.querySelector('.nav-link'),
                 'bitcoin': document.getElementById('nav-bitcoin'),
                 'sentiment': document.getElementById('nav-sentiment'),
+                'portfolio': document.getElementById('nav-portfolio'),
+                'watchlist': document.getElementById('nav-watchlist'),
+                'heatmap': document.getElementById('nav-heatmap'),
+                'screener': document.getElementById('nav-screener'),
+                'compare': document.getElementById('nav-compare'),
+                'community': document.getElementById('nav-community'),
+                'calendar': document.getElementById('nav-calendar'),
+                'staking': document.getElementById('nav-staking'),
+                'learning': document.getElementById('nav-learning'),
                 'donate': document.getElementById('nav-donate')
             };
             if (navMap[pageId]) navMap[pageId].classList.add('active');
@@ -697,6 +1568,47 @@
                 document.getElementById('sentiment-page').classList.add('active');
                 document.getElementById('sentiment-page').style.display = 'block';
                 fetchGlobalSentiment();
+            } else if (pageId === 'portfolio') {
+                document.getElementById('portfolio-page').classList.add('active');
+                document.getElementById('portfolio-page').style.display = 'block';
+                loadPortfolio();
+                lucide.createIcons();
+            } else if (pageId === 'watchlist') {
+                document.getElementById('watchlist-page').classList.add('active');
+                document.getElementById('watchlist-page').style.display = 'block';
+                loadWatchlist();
+                lucide.createIcons();
+            } else if (pageId === 'heatmap') {
+                document.getElementById('heatmap-page').classList.add('active');
+                document.getElementById('heatmap-page').style.display = 'block';
+                loadHeatmap();
+                lucide.createIcons();
+            } else if (pageId === 'screener') {
+                document.getElementById('screener-page').classList.add('active');
+                document.getElementById('screener-page').style.display = 'block';
+                lucide.createIcons();
+            } else if (pageId === 'compare') {
+                document.getElementById('compare-page').classList.add('active');
+                document.getElementById('compare-page').style.display = 'block';
+                lucide.createIcons();
+            } else if (pageId === 'community') {
+                document.getElementById('community-page').classList.add('active');
+                document.getElementById('community-page').style.display = 'block';
+                loadPolls();
+                lucide.createIcons();
+            } else if (pageId === 'calendar') {
+                document.getElementById('calendar-page').classList.add('active');
+                document.getElementById('calendar-page').style.display = 'block';
+                loadEconomicCalendar();
+                lucide.createIcons();
+            } else if (pageId === 'staking') {
+                document.getElementById('staking-page').classList.add('active');
+                document.getElementById('staking-page').style.display = 'block';
+                lucide.createIcons();
+            } else if (pageId === 'learning') {
+                document.getElementById('learning-page').classList.add('active');
+                document.getElementById('learning-page').style.display = 'block';
+                lucide.createIcons();
             } else if (pageId === 'donate') {
                 document.getElementById('donate-page').classList.add('active');
                 document.getElementById('donate-page').style.display = 'block';
@@ -737,7 +1649,7 @@
             event.target.classList.add('active');
         }
 
-        // ========== AI ANALYSIS WITH GEMINI ==========
+        // ========== AI ANALYSIS WITH GEMINI (FIXED) ==========
         async function generateAIAnalysis() {
             const analysisDiv = document.getElementById('ai-analysis');
             const btn = document.getElementById('ai-btn');
@@ -747,7 +1659,6 @@
             lucide.createIcons();
 
             try {
-                // Fetch current Bitcoin data
                 const btcRes = await fetch('https://api.coingecko.com/api/v3/coins/bitcoin');
                 if (!btcRes.ok) throw new Error('Failed to fetch Bitcoin data');
                 
@@ -759,16 +1670,7 @@
                 const high24h = btcData.market_data.high_24h.usd;
                 const low24h = btcData.market_data.low_24h.usd;
 
-                // Call Gemini API
-                const GEMINI_API_KEY = 'AIzaSyC0E6JMQQNq-Tv2iOOAW16QVOpEZ1nTxiQ';
-                
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{
-                                text: `You are a professional cryptocurrency market analyst. Provide a concise, institutional-grade analysis of Bitcoin's current market conditions based on this data:
+                const prompt = `You are a professional cryptocurrency market analyst. Provide a concise, institutional-grade analysis of Bitcoin's current market conditions based on this data:
 
 Current Price: $${price.toLocaleString()}
 24h Change: ${change24h.toFixed(2)}%
@@ -782,15 +1684,26 @@ Provide analysis covering:
 2. Key technical levels and price action (2-3 sentences)
 3. Short-term outlook and potential catalysts (2 sentences)
 
-Keep the tone professional and data-driven. Format with clear paragraphs.`
-                            }]
-                        }]
+Keep the tone professional and data-driven. Format with clear paragraphs.`;
+
+                // FIXED: Using v1 endpoint instead of v1beta
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ 
+                            parts: [{ text: prompt }] 
+                        }],
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 800
+                        }
                     })
                 });
 
                 if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error?.message || 'API request failed');
+                    const errorData = await response.json();
+                    throw new Error(errorData.error?.message || `API error: ${response.status}`);
                 }
 
                 const data = await response.json();
@@ -801,19 +1714,21 @@ Keep the tone professional and data-driven. Format with clear paragraphs.`
                         <div style="background: #f9f9f9; padding: 20px; border-left: 4px solid var(--accent-gold); margin-top: 10px;">
                             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; font-weight: bold; color: var(--accent-gold);">
                                 <i data-lucide="sparkles" size="18"></i>
-                                AI-Generated Analysis (Gemini Pro) - ${new Date().toLocaleString()}
+                                AI-Generated Analysis (Gemini) - ${new Date().toLocaleString()}
                             </div>
                             ${analysis.split('\n\n').map(p => p.trim() ? `<p style="margin-bottom: 15px;">${p}</p>` : '').join('')}
                         </div>
                     `;
                     lucide.createIcons();
                     showToast("AI Analysis Complete", "success");
+                } else {
+                    throw new Error('No analysis generated');
                 }
 
             } catch (error) {
                 console.error("AI Analysis error:", error);
                 analysisDiv.innerHTML = `
-                    <div style="color: var(--bearish); padding: 20px; text-align: center; background: #fff3f3; border: 1px solid var(--bearish);">
+                    <div style="color: var(--bearish); padding: 20px; text-align: center; background: #fff3f3; border: 1px solid var(--bearish); border-radius: 4px;">
                         <i data-lucide="alert-circle" size="24"></i>
                         <p style="margin-top: 10px; font-weight: bold;">AI Analysis Error</p>
                         <p style="font-size: 12px; color: #666; margin-top: 10px; line-height: 1.6;">
@@ -825,6 +1740,934 @@ Keep the tone professional and data-driven. Format with clear paragraphs.`
             } finally {
                 btn.disabled = false;
             }
+        }
+
+        // ========== NEWS ANALYSIS (FIXED) ==========
+        async function analyzeNews(button, title, description) {
+            const resultDiv = button.nextElementSibling;
+            button.disabled = true;
+            button.innerHTML = '<i data-lucide="loader" size="14" class="rotating" style="display: inline; vertical-align: middle;"></i> ANALYZING...';
+            lucide.createIcons();
+            
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<div style="text-align: center;"><i data-lucide="loader" size="20" class="rotating"></i> AI is analyzing...</div>';
+            lucide.createIcons();
+
+            try {
+                const prompt = `Analyze this economic news event for cryptocurrency and financial markets:
+
+Title: ${title}
+Description: ${description}
+
+Provide:
+1. A brief 2-sentence summary of what this means
+2. Market verdict: BULLISH, BEARISH, or NEUTRAL (and why in 1 sentence)
+3. Potential impact on crypto markets (1-2 sentences)
+
+Be direct and professional. Start with the verdict.`;
+
+                // FIXED: Using v1 endpoint instead of v1beta
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ 
+                            parts: [{ text: prompt }] 
+                        }],
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 500
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error?.message || 'Analysis failed');
+                }
+
+                const data = await response.json();
+                const analysis = data.candidates[0]?.content?.parts?.[0]?.text;
+                
+                if (!analysis) throw new Error('No analysis generated');
+                
+                // Determine verdict
+                let verdict = 'NEUTRAL';
+                let verdictClass = 'verdict-neutral';
+                let verdictIcon = 'minus';
+                
+                if (analysis.toUpperCase().includes('BULLISH')) {
+                    verdict = 'BULLISH';
+                    verdictClass = 'verdict-bullish';
+                    verdictIcon = 'trending-up';
+                } else if (analysis.toUpperCase().includes('BEARISH')) {
+                    verdict = 'BEARISH';
+                    verdictClass = 'verdict-bearish';
+                    verdictIcon = 'trending-down';
+                }
+
+                resultDiv.innerHTML = `
+                    <div class="analysis-verdict ${verdictClass}">
+                        <i data-lucide="${verdictIcon}" size="16" style="display: inline; vertical-align: middle;"></i>
+                        Verdict: ${verdict}
+                    </div>
+                    <div style="font-size: 13px; line-height: 1.6; white-space: pre-line;">
+                        ${analysis}
+                    </div>
+                `;
+                lucide.createIcons();
+
+            } catch (error) {
+                console.error("News analysis error:", error);
+                resultDiv.innerHTML = `
+                    <div style="color: var(--bearish); padding: 15px; background: #fff3f3; border-radius: 4px;">
+                        <i data-lucide="alert-circle" size="16" style="display: inline; vertical-align: middle;"></i>
+                        Analysis failed: ${error.message}
+                    </div>
+                `;
+                lucide.createIcons();
+            } finally {
+                button.disabled = false;
+                button.innerHTML = '<i data-lucide="sparkles" size="14" style="display: inline; vertical-align: middle;"></i> ANALYZE WITH AI';
+                lucide.createIcons();
+            }
+        }
+
+        // ========== ECONOMIC CALENDAR (ALPHA VANTAGE) ==========
+        async function loadEconomicCalendar() {
+            const container = document.getElementById('calendar-events');
+            
+            try {
+                // Fetch Fed Funds Rate
+                const fedRes = await fetch(`https://www.alphavantage.co/query?function=FEDERAL_FUNDS_RATE&apikey=${ALPHA_VANTAGE_API_KEY}`);
+                const fedData = await fedRes.json();
+                
+                // Fetch CPI
+                const cpiRes = await fetch(`https://www.alphavantage.co/query?function=CPI&interval=monthly&apikey=${ALPHA_VANTAGE_API_KEY}`);
+                const cpiData = await cpiRes.json();
+                
+                // Fetch Unemployment
+                const unemploymentRes = await fetch(`https://www.alphavantage.co/query?function=UNEMPLOYMENT&apikey=${ALPHA_VANTAGE_API_KEY}`);
+                const unemploymentData = await unemploymentRes.json();
+
+                let eventsHTML = '';
+
+                // Fed Funds Rate Event
+                if (fedData.data && fedData.data.length > 0) {
+                    const latestFed = fedData.data[0];
+                    eventsHTML += createEventCard(
+                        'Federal Reserve Interest Rate',
+                        'HIGH',
+                        latestFed.date,
+                        `The Federal Funds Rate stands at ${latestFed.value}%. The Fed uses this rate to influence economic growth and control inflation. Changes to this rate significantly impact cryptocurrency markets as investors adjust risk appetite.`
+                    );
+                }
+
+                // CPI Event
+                if (cpiData.data && cpiData.data.length > 0) {
+                    const latestCPI = cpiData.data[0];
+                    eventsHTML += createEventCard(
+                        'CPI (Consumer Price Index) Report',
+                        'HIGH',
+                        latestCPI.date,
+                        `Latest CPI reading: ${latestCPI.value}. This inflation metric is closely watched by the Federal Reserve and crypto traders. Higher inflation often drives investors toward alternative assets like Bitcoin.`
+                    );
+                }
+
+                // Unemployment Event
+                if (unemploymentData.data && unemploymentData.data.length > 0) {
+                    const latestUnemployment = unemploymentData.data[0];
+                    eventsHTML += createEventCard(
+                        'US Unemployment Rate',
+                        'MEDIUM',
+                        latestUnemployment.date,
+                        `Current unemployment rate: ${latestUnemployment.value}%. Labor market strength influences Fed policy decisions and risk asset performance including cryptocurrencies.`
+                    );
+                }
+
+                // Add some upcoming events (static for demonstration)
+                eventsHTML += createEventCard(
+                    'FOMC Meeting Minutes Release',
+                    'HIGH',
+                    'February 20, 2026',
+                    'The Federal Open Market Committee will release detailed minutes from their latest meeting, providing insights into future monetary policy direction and economic outlook.'
+                );
+
+                eventsHTML += createEventCard(
+                    'PPI (Producer Price Index)',
+                    'MEDIUM',
+                    'February 18, 2026',
+                    'Producer price inflation data measures wholesale price changes. Leading indicator for consumer inflation and Fed policy decisions.'
+                );
+
+                eventsHTML += createEventCard(
+                    'Non-Farm Payrolls',
+                    'HIGH',
+                    'March 7, 2026',
+                    'Monthly employment report showing job creation in the US economy. Strong job growth can impact Fed rate decisions and market volatility.'
+                );
+
+                container.innerHTML = eventsHTML || '<p style="text-align: center; color: #666; padding: 40px;">No economic data available. API limit may have been reached.</p>';
+                lucide.createIcons();
+
+            } catch (error) {
+                console.error("Economic calendar error:", error);
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <i data-lucide="alert-circle" size="48" style="color: var(--bearish);"></i>
+                        <p style="margin-top: 20px; color: #666;">Failed to load economic calendar</p>
+                        <p style="font-size: 12px; color: #999; margin-top: 10px;">Please check API key or try again later</p>
+                    </div>
+                `;
+                lucide.createIcons();
+            }
+        }
+
+        function createEventCard(title, impact, date, description) {
+            const impactClass = impact === 'HIGH' ? 'impact-high' : impact === 'MEDIUM' ? 'impact-medium' : 'impact-low';
+            const safeTitle = title.replace(/'/g, "\\'");
+            const safeDesc = description.replace(/'/g, "\\'");
+            
+            return `
+                <div class="news-item">
+                    <div class="news-header">
+                        <div class="news-title">${title}</div>
+                        <span class="impact-badge ${impactClass}">${impact} IMPACT</span>
+                    </div>
+                    <div class="news-date">
+                        <i data-lucide="calendar" size="14" style="display: inline; vertical-align: middle;"></i>
+                        ${date}
+                    </div>
+                    <div class="news-description">
+                        ${description}
+                    </div>
+                    <button class="analyze-btn" onclick="analyzeNews(this, '${safeTitle}', '${safeDesc}')">
+                        <i data-lucide="sparkles" size="14" style="display: inline; vertical-align: middle;"></i>
+                        ANALYZE WITH AI
+                    </button>
+                    <div class="analysis-result" style="display: none;"></div>
+                </div>
+            `;
+        }
+
+        // ========== COMMUNITY POLLS ==========
+        async function loadPolls() {
+            if (!firebaseInitialized || !db) {
+                document.getElementById('polls-container').innerHTML = '<p style="text-align: center; color: #666;">Community features unavailable</p>';
+                return;
+            }
+
+            try {
+                const pollsSnapshot = await db.collection('polls').orderBy('createdAt', 'desc').get();
+                const pollsContainer = document.getElementById('polls-container');
+                
+                if (pollsSnapshot.empty) {
+                    pollsContainer.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">No polls available yet. Check back soon!</p>';
+                    return;
+                }
+
+                pollsContainer.innerHTML = '';
+                
+                for (const doc of pollsSnapshot.docs) {
+                    const poll = doc.data();
+                    const pollId = doc.id;
+                    
+                    let userVote = null;
+                    if (currentUser) {
+                        const voteDoc = await db.collection('polls').doc(pollId).collection('votes').doc(currentUser.uid).get();
+                        if (voteDoc.exists) {
+                            userVote = voteDoc.data().vote;
+                        }
+                    }
+
+                    const votesSnapshot = await db.collection('polls').doc(pollId).collection('votes').get();
+                    const yesVotes = votesSnapshot.docs.filter(v => v.data().vote === 'yes').length;
+                    const noVotes = votesSnapshot.docs.filter(v => v.data().vote === 'no').length;
+                    const total = yesVotes + noVotes;
+
+                    const commentsSnapshot = await db.collection('polls').doc(pollId).collection('comments').orderBy('timestamp', 'desc').limit(5).get();
+                    const comments = commentsSnapshot.docs.map(c => c.data());
+
+                    const pollCard = document.createElement('div');
+                    pollCard.className = 'poll-card';
+                    pollCard.innerHTML = `
+                        <h2 style="font-family: 'Playfair Display'; font-size: 24px; margin-bottom: 15px;">${poll.question}</h2>
+                        <p style="color: #666; font-size: 13px; margin-bottom: 20px;">${poll.description || ''}</p>
+                        
+                        ${!userVote && currentUser ? `
+                            <div>
+                                <button class="vote-btn" onclick="vote('${pollId}', 'yes')">
+                                    <i data-lucide="thumbs-up" size="16" style="display: inline; vertical-align: middle;"></i> YES
+                                </button>
+                                <button class="vote-btn" onclick="vote('${pollId}', 'no')">
+                                    <i data-lucide="thumbs-down" size="16" style="display: inline; vertical-align: middle;"></i> NO
+                                </button>
+                            </div>
+                        ` : !currentUser ? `
+                            <p style="color: #999; font-size: 12px; font-style: italic;">Login to vote</p>
+                        ` : ''}
+                        
+                        ${userVote || total > 0 ? `
+                            <div class="vote-results">
+                                <div class="vote-bar">
+                                    <div class="vote-bar-fill" style="width: ${total > 0 ? (yesVotes/total*100) : 0}%;"></div>
+                                    <div class="vote-bar-label">YES - ${yesVotes} votes (${total > 0 ? (yesVotes/total*100).toFixed(1) : 0}%)</div>
+                                </div>
+                                <div class="vote-bar">
+                                    <div class="vote-bar-fill" style="width: ${total > 0 ? (noVotes/total*100) : 0}%; background: var(--bearish);"></div>
+                                    <div class="vote-bar-label">NO - ${noVotes} votes (${total > 0 ? (noVotes/total*100).toFixed(1) : 0}%)</div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        <div class="comment-section">
+                            <h3 style="font-size: 14px; font-weight: bold; margin-bottom: 15px;">
+                                <i data-lucide="message-circle" size="16" style="display: inline; vertical-align: middle;"></i>
+                                Comments (${commentsSnapshot.size})
+                            </h3>
+                            
+                            ${currentUser ? `
+                                <textarea class="comment-input" id="comment-${pollId}" placeholder="Share your thoughts..."></textarea>
+                                <button class="auth-btn" style="max-width: 200px;" onclick="postComment('${pollId}')">POST COMMENT</button>
+                            ` : `
+                                <p style="color: #999; font-size: 12px; font-style: italic;">Login to comment</p>
+                            `}
+                            
+                            <div style="margin-top: 20px;">
+                                ${comments.map(c => `
+                                    <div class="comment">
+                                        <div class="comment-author">${c.userName}</div>
+                                        <div class="comment-text">${c.text}</div>
+                                        <div class="comment-time">${c.timestamp ? new Date(c.timestamp.toDate()).toLocaleString() : ''}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                    
+                    pollsContainer.appendChild(pollCard);
+                }
+                
+                lucide.createIcons();
+
+            } catch (error) {
+                console.error("Load polls error:", error);
+                document.getElementById('polls-container').innerHTML = '<p style="text-align: center; color: var(--bearish);">Error loading polls</p>';
+            }
+        }
+
+        async function vote(pollId, voteValue) {
+            if (!currentUser) {
+                showToast("Please login to vote", "error");
+                return;
+            }
+
+            try {
+                await db.collection('polls').doc(pollId).collection('votes').doc(currentUser.uid).set({
+                    vote: voteValue,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                showToast("Vote recorded!", "success");
+                loadPolls();
+            } catch (error) {
+                showToast("Vote failed", "error");
+            }
+        }
+
+        async function postComment(pollId) {
+            if (!currentUser) {
+                showToast("Please login to comment", "error");
+                return;
+            }
+
+            const commentText = document.getElementById(`comment-${pollId}`).value.trim();
+            if (!commentText) {
+                showToast("Comment cannot be empty", "error");
+                return;
+            }
+
+            try {
+                await db.collection('polls').doc(pollId).collection('comments').add({
+                    text: commentText,
+                    userId: currentUser.uid,
+                    userName: currentUser.displayName || currentUser.email.split('@')[0],
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                showToast("Comment posted!", "success");
+                loadPolls();
+            } catch (error) {
+                showToast("Comment failed", "error");
+            }
+        }
+
+        // ========== PORTFOLIO TRACKER ==========
+        async function loadPortfolio() {
+            if (!currentUser) {
+                document.getElementById('portfolio-login-prompt').style.display = 'block';
+                document.getElementById('portfolio-content').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('portfolio-login-prompt').style.display = 'none';
+            document.getElementById('portfolio-content').style.display = 'block';
+
+            if (!firebaseInitialized || !db) return;
+
+            try {
+                const portfolioSnapshot = await db.collection('users').doc(currentUser.uid).collection('portfolio').get();
+                const holdingsDiv = document.getElementById('portfolio-holdings');
+                holdingsDiv.innerHTML = '';
+
+                let totalValue = 0;
+                let totalInvested = 0;
+
+                for (const doc of portfolioSnapshot.docs) {
+                    const holding = doc.data();
+                    
+                    const priceRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${holding.coinId}&vs_currencies=usd`);
+                    const priceData = await priceRes.json();
+                    const currentPrice = priceData[holding.coinId]?.usd || 0;
+                    
+                    const currentValue = holding.amount * currentPrice;
+                    const investedValue = holding.amount * holding.buyPrice;
+                    const pnl = currentValue - investedValue;
+                    const pnlPercent = ((pnl / investedValue) * 100).toFixed(2);
+
+                    totalValue += currentValue;
+                    totalInvested += investedValue;
+
+                    const holdingCard = document.createElement('div');
+                    holdingCard.className = 'portfolio-holding';
+                    holdingCard.innerHTML = `
+                        <button class="remove-coin" onclick="removeHolding('${doc.id}')">REMOVE</button>
+                        <h3 style="font-family: 'Playfair Display'; font-size: 18px; margin-bottom: 10px; text-transform: uppercase;">${holding.symbol}</h3>
+                        <div style="font-size: 10px; color: #666; margin-bottom: 15px;">${holding.name}</div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                            <div>
+                                <div style="font-size: 10px; color: #666;">Holdings</div>
+                                <div style="font-weight: bold; font-size: 14px;">${holding.amount}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 10px; color: #666;">Buy Price</div>
+                                <div style="font-weight: bold; font-size: 14px;">$${holding.buyPrice.toLocaleString()}</div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-bottom: 10px;">
+                            <div style="font-size: 10px; color: #666;">Current Price</div>
+                            <div style="font-size: 20px; font-weight: 800; color: var(--accent-gold);">$${currentPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 6})}</div>
+                        </div>
+                        
+                        <div style="padding: 15px; background: var(--news-gray); margin-top: 15px; border-radius: 3px;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <div style="font-size: 10px; color: #666;">Current Value</div>
+                                    <div style="font-weight: bold;">$${currentValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 10px; color: #666;">P&L</div>
+                                    <div style="font-weight: bold; color: ${pnl >= 0 ? 'var(--bullish)' : 'var(--bearish)'};">
+                                        ${pnl >= 0 ? '+' : ''}$${pnl.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                        (${pnl >= 0 ? '+' : ''}${pnlPercent}%)
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="font-size: 10px; color: #999; margin-top: 10px;">
+                            Purchase Date: ${new Date(holding.buyDate).toLocaleDateString()}
+                        </div>
+                    `;
+                    
+                    holdingsDiv.appendChild(holdingCard);
+                }
+
+                const totalPnl = totalValue - totalInvested;
+                const totalRoi = ((totalPnl / totalInvested) * 100).toFixed(2);
+
+                document.getElementById('portfolio-total-value').innerText = `$${totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                document.getElementById('portfolio-total-invested').innerText = `$${totalInvested.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                
+                const pnlEl = document.getElementById('portfolio-pnl');
+                pnlEl.innerText = `${totalPnl >= 0 ? '+' : ''}$${totalPnl.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                pnlEl.style.color = totalPnl >= 0 ? 'var(--bullish)' : 'var(--bearish)';
+                
+                const roiEl = document.getElementById('portfolio-roi');
+                roiEl.innerText = `${totalPnl >= 0 ? '+' : ''}${totalRoi}%`;
+                roiEl.style.color = totalPnl >= 0 ? 'var(--bullish)' : 'var(--bearish)';
+
+                lucide.createIcons();
+
+            } catch (error) {
+                console.error("Portfolio load error:", error);
+            }
+        }
+
+        async function removeHolding(docId) {
+            if (confirm('Remove this holding from your portfolio?')) {
+                try {
+                    await db.collection('users').doc(currentUser.uid).collection('portfolio').doc(docId).delete();
+                    showToast("Holding removed", "success");
+                    loadPortfolio();
+                } catch (error) {
+                    showToast("Failed to remove", "error");
+                }
+            }
+        }
+
+        // ========== WATCHLIST WITH EMAIL ALERTS ==========
+        async function loadWatchlist() {
+            if (!currentUser) {
+                document.getElementById('watchlist-login-prompt').style.display = 'block';
+                document.getElementById('watchlist-content').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('watchlist-login-prompt').style.display = 'none';
+            document.getElementById('watchlist-content').style.display = 'block';
+
+            if (!firebaseInitialized || !db) return;
+
+            try {
+                const watchlistSnapshot = await db.collection('users').doc(currentUser.uid).collection('watchlist').get();
+                const watchlistItems = document.getElementById('watchlist-items');
+                watchlistItems.innerHTML = '';
+
+                for (const doc of watchlistSnapshot.docs) {
+                    const coin = doc.data();
+                    
+                    const priceRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coin.coinId}&vs_currencies=usd&include_24hr_change=true`);
+                    const priceData = await priceRes.json();
+                    const currentPrice = priceData[coin.coinId]?.usd || 0;
+                    const change24h = priceData[coin.coinId]?.usd_24h_change || 0;
+
+                    const alerts = coin.alerts || [];
+                    let triggeredAlerts = [];
+                    for (const alert of alerts) {
+                        if (alert.type === 'above' && currentPrice >= alert.price) {
+                            triggeredAlerts.push(alert);
+                        } else if (alert.type === 'below' && currentPrice <= alert.price) {
+                            triggeredAlerts.push(alert);
+                        }
+                    }
+
+                    // Check if we should send email notification
+                    if (triggeredAlerts.length > 0 && !coin.alertSent) {
+                        sendPriceAlertEmail(coin, currentPrice, triggeredAlerts);
+                        // Mark alert as sent
+                        await db.collection('users').doc(currentUser.uid).collection('watchlist').doc(doc.id).update({
+                            alertSent: true
+                        });
+                    }
+
+                    const coinCard = document.createElement('div');
+                    coinCard.className = 'watchlist-coin';
+                    coinCard.innerHTML = `
+                        <button class="remove-coin" onclick="removeCoinFromWatchlist('${doc.id}')">REMOVE</button>
+                        <h3 style="font-family: 'Playfair Display'; font-size: 22px; margin-bottom: 10px; text-transform: uppercase;">${coin.symbol}</h3>
+                        <div style="font-size: 11px; color: #666; margin-bottom: 10px;">${coin.name}</div>
+                        <div style="font-size: 32px; font-weight: 800; color: var(--accent-gold);">$${currentPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 6})}</div>
+                        <div style="font-size: 14px; margin-top: 5px; color: ${change24h >= 0 ? 'var(--bullish)' : 'var(--bearish)'};">
+                            ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}% (24h)
+                        </div>
+                        
+                        ${triggeredAlerts.length > 0 ? `
+                            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin-top: 15px;">
+                                <strong style="color: #856404;">🔔 Alert Triggered!</strong>
+                                ${triggeredAlerts.map(a => `<div style="font-size: 12px; color: #856404;">Price ${a.type} $${a.price}</div>`).join('')}
+                            </div>
+                        ` : ''}
+                        
+                        <div class="alert-section">
+                            <h4 style="font-size: 12px; font-weight: bold; margin-bottom: 10px;">PRICE ALERTS</h4>
+                            <input type="number" class="alert-input" id="alert-price-${doc.id}" placeholder="Price" step="0.01">
+                            <select class="alert-input" id="alert-type-${doc.id}" style="width: auto;">
+                                <option value="above">Above</option>
+                                <option value="below">Below</option>
+                            </select>
+                            <button class="add-alert-btn" onclick="addAlert('${doc.id}', '${coin.coinId}')">ADD ALERT</button>
+                            
+                            <div style="margin-top: 10px;">
+                                ${alerts.map((a, i) => `
+                                    <div class="alert-item">
+                                        <span>Alert when price is ${a.type} $${a.price}</span>
+                                        <button class="delete-alert" onclick="deleteAlert('${doc.id}', ${i})">DELETE</button>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                    
+                    watchlistItems.appendChild(coinCard);
+                }
+
+                lucide.createIcons();
+
+            } catch (error) {
+                console.error("Watchlist load error:", error);
+            }
+        }
+
+        async function sendPriceAlertEmail(coin, currentPrice, triggeredAlerts) {
+            if (!currentUser || !currentUser.email) return;
+            
+            const alertDetails = triggeredAlerts.map(a => 
+                `${coin.name} (${coin.symbol.toUpperCase()}) is now ${a.type} your target price of $${a.price}!`
+            ).join('\n');
+            
+            const message = `
+🔔 LYNX Intelligence Price Alert!
+
+Your price target has been hit!
+
+${alertDetails}
+
+Current Price: $${currentPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 6})}
+
+This is an automated alert from your LYNX Intelligence watchlist.
+
+---
+LYNX Intelligence
+Institutional Grade Financial Data • 100% Free
+            `;
+
+            // Browser notification
+            showBrowserNotification(
+                `🔔 Price Alert: ${coin.symbol.toUpperCase()}`,
+                `${coin.name} is now $${currentPrice.toLocaleString()}`
+            );
+
+            // Toast notification
+            showToast(`Alert: ${coin.symbol.toUpperCase()} hit target price!`, "success");
+
+            // NOTE: EmailJS integration
+            // Uncomment and configure EmailJS to enable email notifications
+            // Get your keys from https://www.emailjs.com/
+            
+            /*
+            try {
+                await emailjs.send(
+                    EMAILJS_SERVICE_ID,
+                    EMAILJS_TEMPLATE_ID,
+                    {
+                        to_email: currentUser.email,
+                        to_name: currentUser.displayName || 'Trader',
+                        coin_name: coin.name,
+                        coin_symbol: coin.symbol.toUpperCase(),
+                        current_price: currentPrice.toLocaleString(),
+                        alert_message: alertDetails,
+                        message: message
+                    }
+                );
+                console.log(`✅ Email sent to ${currentUser.email}`);
+            } catch (error) {
+                console.error("Email send error:", error);
+            }
+            */
+        }
+
+        // Price monitoring for alerts
+        function startPriceMonitoring() {
+            if (priceCheckInterval) return;
+            
+            priceCheckInterval = setInterval(() => {
+                if (currentUser && document.getElementById('watchlist-page').classList.contains('active')) {
+                    loadWatchlist();
+                }
+            }, 60000); // Check every minute
+        }
+
+        function stopPriceMonitoring() {
+            if (priceCheckInterval) {
+                clearInterval(priceCheckInterval);
+                priceCheckInterval = null;
+            }
+        }
+
+        async function removeCoinFromWatchlist(docId) {
+            if (confirm('Remove this coin from your watchlist?')) {
+                try {
+                    await db.collection('users').doc(currentUser.uid).collection('watchlist').doc(docId).delete();
+                    showToast("Coin removed", "success");
+                    loadWatchlist();
+                } catch (error) {
+                    showToast("Failed to remove", "error");
+                }
+            }
+        }
+
+        async function addAlert(docId, coinId) {
+            const price = parseFloat(document.getElementById(`alert-price-${docId}`).value);
+            const type = document.getElementById(`alert-type-${docId}`).value;
+
+            if (!price || price <= 0) {
+                showToast("Enter valid price", "error");
+                return;
+            }
+
+            try {
+                const docRef = db.collection('users').doc(currentUser.uid).collection('watchlist').doc(docId);
+                const doc = await docRef.get();
+                const alerts = doc.data().alerts || [];
+                
+                alerts.push({ price, type });
+                
+                await docRef.update({ 
+                    alerts,
+                    alertSent: false // Reset alert sent flag when new alert is added
+                });
+                showToast("Alert added", "success");
+                loadWatchlist();
+            } catch (error) {
+                showToast("Failed to add alert", "error");
+            }
+        }
+
+        async function deleteAlert(docId, alertIndex) {
+            try {
+                const docRef = db.collection('users').doc(currentUser.uid).collection('watchlist').doc(docId);
+                const doc = await docRef.get();
+                const alerts = doc.data().alerts || [];
+                
+                alerts.splice(alertIndex, 1);
+                
+                await docRef.update({ alerts });
+                showToast("Alert deleted", "success");
+                loadWatchlist();
+            } catch (error) {
+                showToast("Failed to delete alert", "error");
+            }
+        }
+
+        // ========== MARKET HEATMAP ==========
+        async function loadHeatmap() {
+            try {
+                const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h');
+                const coins = await res.json();
+                
+                const container = document.getElementById('heatmap-container');
+                container.innerHTML = '';
+                
+                coins.forEach(coin => {
+                    const change = coin.price_change_percentage_24h || 0;
+                    const intensity = Math.min(Math.abs(change) / 10, 1);
+                    const bgColor = change >= 0 
+                        ? `rgba(26, 125, 26, ${intensity})` 
+                        : `rgba(178, 18, 3, ${intensity})`;
+                    
+                    const cell = document.createElement('div');
+                    cell.className = 'heatmap-cell';
+                    cell.style.backgroundColor = bgColor;
+                    cell.style.color = intensity > 0.5 ? 'white' : 'var(--ink-black)';
+                    cell.innerHTML = `
+                        <div style="font-weight: bold; font-size: 12px; margin-bottom: 5px;">${coin.symbol.toUpperCase()}</div>
+                        <div style="font-size: 18px; font-weight: 800;">${change >= 0 ? '+' : ''}${change.toFixed(2)}%</div>
+                        <div style="font-size: 10px; margin-top: 5px;">$${coin.current_price.toLocaleString()}</div>
+                    `;
+                    cell.onclick = () => {
+                        showToast(`${coin.name}: $${coin.current_price.toLocaleString()}`, "info");
+                    };
+                    container.appendChild(cell);
+                });
+                
+                lucide.createIcons();
+            } catch (error) {
+                console.error("Heatmap error:", error);
+                document.getElementById('heatmap-container').innerHTML = '<p style="text-align: center; color: var(--bearish); padding: 40px;">Failed to load heatmap</p>';
+            }
+        }
+
+        function filterHeatmap(filter) {
+            document.querySelectorAll('.heatmap-container .timeframe-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.querySelectorAll('.heatmap-cell').forEach(cell => {
+                const changeText = cell.querySelector('div:nth-child(2)').innerText;
+                const change = parseFloat(changeText);
+                
+                if (filter === 'gainers' && change < 0) {
+                    cell.style.display = 'none';
+                } else if (filter === 'losers' && change >= 0) {
+                    cell.style.display = 'none';
+                } else {
+                    cell.style.display = 'block';
+                }
+            });
+        }
+
+        // ========== MARKET SCREENER ==========
+        async function applyScreenerFilters() {
+            const minCap = parseFloat(document.getElementById('filter-min-cap').value) || 0;
+            const maxCap = parseFloat(document.getElementById('filter-max-cap').value) || Infinity;
+            const minChange = parseFloat(document.getElementById('filter-min-change').value) || -Infinity;
+            const maxChange = parseFloat(document.getElementById('filter-max-change').value) || Infinity;
+            
+            const resultsDiv = document.getElementById('screener-results');
+            resultsDiv.innerHTML = '<div style="text-align: center; padding: 40px;"><i data-lucide="loader" size="48" class="rotating" style="color: var(--accent-gold);"></i><p style="margin-top: 20px;">Screening cryptocurrencies...</p></div>';
+            lucide.createIcons();
+            
+            try {
+                const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&sparkline=false&price_change_percentage=24h');
+                const coins = await res.json();
+                
+                const filtered = coins.filter(coin => {
+                    const marketCap = coin.market_cap || 0;
+                    const change = coin.price_change_percentage_24h || 0;
+                    
+                    return marketCap >= minCap && 
+                           marketCap <= maxCap && 
+                           change >= minChange && 
+                           change <= maxChange;
+                });
+                
+                if (filtered.length === 0) {
+                    resultsDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;">No cryptocurrencies match your filters</div>';
+                    return;
+                }
+                
+                resultsDiv.innerHTML = `
+                    <h3 style="font-family: 'Playfair Display'; font-size: 24px; margin-bottom: 20px;">
+                        ${filtered.length} Results Found
+                    </h3>
+                    <div style="display: grid; gap: 20px;">
+                        ${filtered.map(coin => `
+                            <div class="card" style="padding: 20px; display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <h4 style="font-weight: bold; font-size: 16px; margin-bottom: 5px;">${coin.name} (${coin.symbol.toUpperCase()})</h4>
+                                    <div style="font-size: 12px; color: #666;">Rank #${coin.market_cap_rank}</div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-size: 20px; font-weight: 800;">$${coin.current_price.toLocaleString()}</div>
+                                    <div style="font-size: 14px; color: ${coin.price_change_percentage_24h >= 0 ? 'var(--bullish)' : 'var(--bearish)'};">
+                                        ${coin.price_change_percentage_24h >= 0 ? '+' : ''}${coin.price_change_percentage_24h.toFixed(2)}%
+                                    </div>
+                                    <div style="font-size: 11px; color: #666; margin-top: 5px;">
+                                        MCap: $${(coin.market_cap / 1e9).toFixed(2)}B
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                
+                lucide.createIcons();
+            } catch (error) {
+                console.error("Screener error:", error);
+                resultsDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--bearish);">Failed to load screener results</div>';
+            }
+        }
+
+        // ========== COMPARISON TOOL ==========
+        async function loadComparison() {
+            const coin1 = document.getElementById('compare-coin1').value.trim().toLowerCase();
+            const coin2 = document.getElementById('compare-coin2').value.trim().toLowerCase();
+            
+            if (!coin1 || !coin2) {
+                showToast("Enter both cryptocurrencies", "error");
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('comparison-results');
+            resultsDiv.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px;"><i data-lucide="loader" size="48" class="rotating" style="color: var(--accent-gold);"></i><p style="margin-top: 20px;">Loading comparison...</p></div>';
+            lucide.createIcons();
+            
+            try {
+                const [res1, res2] = await Promise.all([
+                    fetch(`https://api.coingecko.com/api/v3/coins/${coin1}`),
+                    fetch(`https://api.coingecko.com/api/v3/coins/${coin2}`)
+                ]);
+                
+                if (!res1.ok || !res2.ok) throw new Error('One or both cryptocurrencies not found');
+                
+                const [data1, data2] = await Promise.all([res1.json(), res2.json()]);
+                
+                resultsDiv.innerHTML = `
+                    ${createComparisonCard(data1)}
+                    ${createComparisonCard(data2)}
+                `;
+                
+                lucide.createIcons();
+            } catch (error) {
+                console.error("Comparison error:", error);
+                resultsDiv.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--bearish);">Failed to load comparison. Check coin names and try again.</div>';
+            }
+        }
+
+        function createComparisonCard(data) {
+            const price = data.market_data.current_price.usd;
+            const change24h = data.market_data.price_change_percentage_24h;
+            const marketCap = data.market_data.market_cap.usd;
+            const volume = data.market_data.total_volume.usd;
+            const supply = data.market_data.circulating_supply;
+            const ath = data.market_data.ath.usd;
+            const athChange = data.market_data.ath_change_percentage.usd;
+            
+            return `
+                <div class="comparison-coin">
+                    <h2 style="font-family: 'Playfair Display'; font-size: 28px; margin-bottom: 10px;">${data.name}</h2>
+                    <div style="font-size: 12px; color: #666; margin-bottom: 20px; text-transform: uppercase;">${data.symbol}</div>
+                    
+                    <div style="font-size: 36px; font-weight: 800; color: var(--accent-gold); margin-bottom: 10px;">
+                        $${price.toLocaleString()}
+                    </div>
+                    <div style="font-size: 16px; margin-bottom: 30px; color: ${change24h >= 0 ? 'var(--bullish)' : 'var(--bearish)'};">
+                        ${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}% (24h)
+                    </div>
+                    
+                    <div style="display: grid; gap: 15px; font-size: 13px;">
+                        <div>
+                            <div style="color: #666; margin-bottom: 5px;">Market Cap</div>
+                            <div style="font-weight: bold;">$${(marketCap / 1e9).toFixed(2)}B</div>
+                        </div>
+                        <div>
+                            <div style="color: #666; margin-bottom: 5px;">24h Volume</div>
+                            <div style="font-weight: bold;">$${(volume / 1e9).toFixed(2)}B</div>
+                        </div>
+                        <div>
+                            <div style="color: #666; margin-bottom: 5px;">Circulating Supply</div>
+                            <div style="font-weight: bold;">${supply ? supply.toLocaleString() : 'N/A'}</div>
+                        </div>
+                        <div>
+                            <div style="color: #666; margin-bottom: 5px;">All-Time High</div>
+                            <div style="font-weight: bold;">$${ath.toLocaleString()}</div>
+                            <div style="font-size: 11px; color: ${athChange >= 0 ? 'var(--bullish)' : 'var(--bearish)'};">
+                                ${athChange >= 0 ? '+' : ''}${athChange.toFixed(2)}% from ATH
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ========== STAKING CALCULATOR ==========
+        function calculateStaking() {
+            const amount = parseFloat(document.getElementById('stake-amount').value);
+            const apy = parseFloat(document.getElementById('stake-apy').value);
+            const days = parseInt(document.getElementById('stake-period').value);
+            const compoundFreq = parseInt(document.getElementById('stake-compound').value);
+            
+            if (!amount || !apy || amount <= 0 || apy <= 0) {
+                showToast("Enter valid amount and APY", "error");
+                return;
+            }
+            
+            const r = apy / 100;
+            const n = compoundFreq;
+            const t = days / 365;
+            
+            const finalValue = amount * Math.pow(1 + (r / n), n * t);
+            const rewards = finalValue - amount;
+            const effectiveAPY = (Math.pow(1 + (r / n), n) - 1) * 100;
+            
+            document.getElementById('stake-final-value').innerText = `$${finalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('stake-rewards').innerText = `$${rewards.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('stake-effective-apy').innerText = `${effectiveAPY.toFixed(2)}%`;
+            
+            document.getElementById('staking-result').style.display = 'block';
+            showToast("Staking rewards calculated", "success");
         }
 
         // ========== WALLET SCANNER ==========
@@ -922,7 +2765,10 @@ Keep the tone professional and data-driven. Format with clear paragraphs.`
                 track.innerHTML = Object.keys(data).map(k => `
                     <span class="ticker-item">${k.toUpperCase()}: $${data[k].usd.toLocaleString()} 
                     <span style="color: ${data[k].usd_24h_change >= 0 ? '#1a7d1a' : '#b21203'}">${data[k].usd_24h_change.toFixed(2)}%</span></span>
-                `).join('') + " | ALL FEATURES FREE | 10% TO CHARITY";
+                `).join('') + " | ALL FEATURES FREE | 10% TO CHARITY | PORTFOLIO TRACKER | PRICE ALERTS";
+                
+                // Duplicate for seamless loop
+                track.innerHTML += track.innerHTML;
             } catch (e) { 
                 console.error("Ticker sync failed:", e);
             }
@@ -992,21 +2838,66 @@ Keep the tone professional and data-driven. Format with clear paragraphs.`
             }
         }
 
+        async function fetchTopGainers() {
+            try {
+                const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=price_change_percentage_24h_desc&per_page=5&page=1');
+                const coins = await res.json();
+                
+                document.getElementById('top-gainers').innerHTML = coins.map(coin => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #ddd; font-size: 11px;">
+                        <div>
+                            <strong>${coin.symbol.toUpperCase()}</strong>
+                            <div style="color: #666; font-size: 10px;">${coin.name}</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-weight: bold; color: var(--bullish);">+${coin.price_change_percentage_24h.toFixed(2)}%</div>
+                            <div style="font-size: 10px;">$${coin.current_price.toLocaleString()}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error("Top gainers fetch failed:", e);
+            }
+        }
+
+        async function fetchTopLosers() {
+            try {
+                const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=price_change_percentage_24h_asc&per_page=5&page=1');
+                const coins = await res.json();
+                
+                document.getElementById('top-losers').innerHTML = coins.map(coin => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #ddd; font-size: 11px;">
+                        <div>
+                            <strong>${coin.symbol.toUpperCase()}</strong>
+                            <div style="color: #666; font-size: 10px;">${coin.name}</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-weight: bold; color: var(--bearish);">${coin.price_change_percentage_24h.toFixed(2)}%</div>
+                            <div style="font-size: 10px;">$${coin.current_price.toLocaleString()}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error("Top losers fetch failed:", e);
+            }
+        }
+
         // ========== AUTH STATE OBSERVER ==========
         if (firebaseInitialized && auth) {
             auth.onAuthStateChanged(async (user) => {
                 if (user) {
                     currentUser = user;
                     updateUserDisplay();
+                    startPriceMonitoring();
                 } else {
                     currentUser = null;
+                    stopPriceMonitoring();
                 }
             });
         }
 
         // ========== INITIALIZATION ==========
         async function init() {
-            // Time & Date
             setInterval(() => {
                 document.getElementById('live-clock').innerText = new Date().toLocaleString('en-US', { 
                     weekday: 'long', month: 'long', day: 'numeric', 
@@ -1014,24 +2905,31 @@ Keep the tone professional and data-driven. Format with clear paragraphs.`
                 }).toUpperCase();
             }, 1000);
 
-            // Load data
             fetchNews();
             fetchTicker();
             fetchFearGreed();
             fetchMarketOverview();
             fetchGlobalSentiment();
+            fetchTopGainers();
+            fetchTopLosers();
             initChart('tv-container');
+            loadCoinsList();
 
-            // Show welcome message
             setTimeout(() => {
                 showToast("All features are 100% FREE!", "success");
             }, 2000);
+
+            setTimeout(() => {
+                showToast("Portfolio tracker now available!", "info");
+            }, 5000);
         }
 
         init();
         setInterval(fetchTicker, 60000);
         setInterval(fetchFearGreed, 300000);
         setInterval(fetchMarketOverview, 60000);
+        setInterval(fetchTopGainers, 120000);
+        setInterval(fetchTopLosers, 120000);
     </script>
 </body>
 </html>
